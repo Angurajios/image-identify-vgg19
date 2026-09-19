@@ -18,7 +18,7 @@ CORS(app)
 
 CLASS_NAMES = ["Apple", "Elephant", "Pen"]
 
-interpreter = tflite.Interpreter(model_path="vgg19_CustomImage.tflite.tflite")
+interpreter = tflite.Interpreter(model_path="vgg19_CustomImage.tflite")
 interpreter.allocate_tensors()
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
