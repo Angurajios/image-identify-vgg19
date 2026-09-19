@@ -87,7 +87,7 @@
   .upload-icon { font-size: 32px; }
   input[type="file"] { display: none; }
 
-  #video, #preview-img {
+  #video, #preview-img, #captured-preview {
     width: 100%;
     border-radius: 12px;
     display: block;
@@ -185,8 +185,10 @@
     <!-- Camera Panel -->
     <div class="panel" id="camera-panel">
       <video id="video" autoplay playsinline></video>
+      <img id="captured-preview" alt="captured photo" style="display:none;">
       <button class="btn btn-secondary" id="start-camera-btn">Start Camera</button>
       <button class="btn btn-primary" id="capture-btn" style="display:none;">Capture Photo</button>
+      <button class="btn btn-secondary" id="retake-btn" style="display:none;">Retake Photo</button>
       <p class="hint" id="camera-hint">Your browser will ask permission to use the camera.</p>
     </div>
 
@@ -220,8 +222,18 @@ const cameraPanel = document.getElementById('camera-panel');
 tabUpload.addEventListener('click', () => switchTab('upload'));
 tabCamera.addEventListener('click', () => switchTab('camera'));
 
+function resetCameraUI() {
+  capturedPreview.style.display = 'none';
+  video.style.display = 'block';
+  retakeBtn.style.display = 'none';
+  captureBtn.style.display = 'none';
+  startCameraBtn.style.display = 'block';
+  cameraHint.textContent = 'Your browser will ask permission to use the camera.';
+}
+
 function switchTab(tab) {
   stopCamera();
+  resetCameraUI();
   if (tab === 'upload') {
     tabUpload.classList.add('active');
     tabCamera.classList.remove('active');
@@ -261,8 +273,10 @@ fileInput.addEventListener('change', (e) => {
 
 // --- Camera capture ---
 const video = document.getElementById('video');
+const capturedPreview = document.getElementById('captured-preview');
 const startCameraBtn = document.getElementById('start-camera-btn');
 const captureBtn = document.getElementById('capture-btn');
+const retakeBtn = document.getElementById('retake-btn');
 const hiddenCanvas = document.getElementById('hidden-canvas');
 const cameraHint = document.getElementById('camera-hint');
 
@@ -285,9 +299,39 @@ captureBtn.addEventListener('click', () => {
   capturedImageData = hiddenCanvas.toDataURL('image/png');
 
   stopCamera();
+
+  // Show the captured photo instead of the live video
+  video.style.display = 'none';
+  capturedPreview.src = capturedImageData;
+  capturedPreview.style.display = 'block';
+  captureBtn.style.display = 'none';
+  retakeBtn.style.display = 'block';
+
   predictBtn.disabled = false;
   resetBtn.style.display = 'block';
-  cameraHint.textContent = 'Photo captured — click Predict below.';
+  cameraHint.textContent = 'Photo captured — click Predict below, or retake it.';
+});
+
+retakeBtn.addEventListener('click', async () => {
+  capturedImageData = null;
+  predictBtn.disabled = true;
+  resetBtn.style.display = 'none';
+  resetResult();
+
+  capturedPreview.style.display = 'none';
+  video.style.display = 'block';
+  retakeBtn.style.display = 'none';
+
+  // Restart the camera directly instead of making the user click "Start Camera" again
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.srcObject = stream;
+    captureBtn.style.display = 'block';
+    cameraHint.textContent = 'Point the camera at the object, then capture.';
+  } catch (err) {
+    startCameraBtn.style.display = 'block';
+    cameraHint.textContent = 'Could not access camera. Check browser permissions.';
+  }
 });
 
 function stopCamera() {
@@ -308,7 +352,8 @@ resetBtn.addEventListener('click', () => {
   previewWrap.style.display = 'none';
   uploadZone.style.display = 'block';
   fileInput.value = '';
-  cameraHint.textContent = 'Your browser will ask permission to use the camera.';
+  stopCamera();
+  resetCameraUI();
   resetResult();
 });
 
