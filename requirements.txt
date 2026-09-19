@@ -1,0 +1,6 @@
+flask
+flask-cors
+tflite-runtime
+pillow
+numpy<2
+gunicorn

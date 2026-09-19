@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image Classifier — Apple / Elephant / Pen</title>
+<style>
+  :root {
+    --primary: #4f46e5;
+    --primary-dark: #4338ca;
+    --bg: #f8f9fc;
+    --card: #ffffff;
+    --text: #1f2333;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --success: #059669;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    margin: 0;
+    padding: 32px 16px;
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+  }
+  .container {
+    width: 100%;
+    max-width: 520px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 24px;
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 28px;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    margin-bottom: 20px;
+  }
+  .tabs {
+    display: flex;
+    background: #f1f2f6;
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 20px;
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tab-btn.active {
+    background: white;
+    color: var(--primary);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+  }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 32px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .upload-zone:hover { border-color: var(--primary); background: #f5f5ff; }
+  .upload-zone p { margin: 8px 0 0; color: var(--muted); font-size: 14px; }
+  .upload-icon { font-size: 32px; }
+  input[type="file"] { display: none; }
+
+  #video, #preview-img {
+    width: 100%;
+    border-radius: 12px;
+    display: block;
+    background: #000;
+  }
+  #camera-panel { text-align: center; }
+
+  .btn {
+    width: 100%;
+    padding: 13px;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    margin-top: 12px;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover { background: var(--primary-dark); }
+  .btn-secondary { background: #eef0f7; color: var(--text); }
+  .btn-secondary:hover { background: #e2e4f0; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  #preview-wrap { display: none; margin-bottom: 12px; }
+  #preview-img { max-height: 320px; object-fit: contain; }
+
+  .result-card {
+    display: none;
+    text-align: center;
+  }
+  .result-label {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--success);
+    margin: 4px 0;
+  }
+  .result-confidence {
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+  .score-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    font-size: 13px;
+  }
+  .score-name { width: 70px; text-align: left; color: var(--muted); }
+  .score-bar-bg {
+    flex: 1;
+    background: #eef0f7;
+    border-radius: 6px;
+    height: 8px;
+    overflow: hidden;
+  }
+  .score-bar-fill {
+    height: 100%;
+    background: var(--primary);
+    border-radius: 6px;
+    transition: width 0.4s ease;
+  }
+  .score-value { width: 44px; text-align: right; color: var(--muted); }
+
+  .error-text { color: #dc2626; font-size: 14px; text-align: center; }
+  .hint { font-size: 12px; color: var(--muted); text-align: center; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Image Classifier</h1>
+  <p class="subtitle">Detects: Apple &nbsp;•&nbsp; Elephant &nbsp;•&nbsp; Pen</p>
+
+  <div class="card">
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-upload">Upload</button>
+      <button class="tab-btn" id="tab-camera">Camera</button>
+    </div>
+
+    <!-- Upload Panel -->
+    <div class="panel active" id="upload-panel">
+      <div id="preview-wrap">
+        <img id="preview-img" alt="preview">
+      </div>
+      <label class="upload-zone" id="upload-zone">
+        <div class="upload-icon">📁</div>
+        <p>Click to choose an image, or drag one here</p>
+        <input type="file" id="file-input" accept="image/*">
+      </label>
+    </div>
+
+    <!-- Camera Panel -->
+    <div class="panel" id="camera-panel">
+      <video id="video" autoplay playsinline></video>
+      <button class="btn btn-secondary" id="start-camera-btn">Start Camera</button>
+      <button class="btn btn-primary" id="capture-btn" style="display:none;">Capture Photo</button>
+      <p class="hint" id="camera-hint">Your browser will ask permission to use the camera.</p>
+    </div>
+
+    <button class="btn btn-primary" id="predict-btn" disabled>Predict</button>
+    <button class="btn btn-secondary" id="reset-btn" style="display:none;">Try Another Image</button>
+  </div>
+
+  <div class="card result-card" id="result-card">
+    <div class="result-label" id="result-label"></div>
+    <div class="result-confidence" id="result-confidence"></div>
+    <div id="score-bars"></div>
+  </div>
+
+  <div class="error-text" id="error-text"></div>
+</div>
+
+<canvas id="hidden-canvas" style="display:none;"></canvas>
+
+<script>
+const BACKEND_URL = '/predict'; // relative path — works since Flask serves this page too
+
+let capturedImageData = null; // base64 data URL of the image to predict
+let stream = null;
+
+// --- Tab switching ---
+const tabUpload = document.getElementById('tab-upload');
+const tabCamera = document.getElementById('tab-camera');
+const uploadPanel = document.getElementById('upload-panel');
+const cameraPanel = document.getElementById('camera-panel');
+
+tabUpload.addEventListener('click', () => switchTab('upload'));
+tabCamera.addEventListener('click', () => switchTab('camera'));
+
+function switchTab(tab) {
+  stopCamera();
+  if (tab === 'upload') {
+    tabUpload.classList.add('active');
+    tabCamera.classList.remove('active');
+    uploadPanel.classList.add('active');
+    cameraPanel.classList.remove('active');
+  } else {
+    tabCamera.classList.add('active');
+    tabUpload.classList.remove('active');
+    cameraPanel.classList.add('active');
+    uploadPanel.classList.remove('active');
+  }
+  resetResult();
+}
+
+// --- File upload ---
+const fileInput = document.getElementById('file-input');
+const uploadZone = document.getElementById('upload-zone');
+const previewWrap = document.getElementById('preview-wrap');
+const previewImg = document.getElementById('preview-img');
+const predictBtn = document.getElementById('predict-btn');
+const resetBtn = document.getElementById('reset-btn');
+
+fileInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    capturedImageData = event.target.result;
+    previewImg.src = capturedImageData;
+    previewWrap.style.display = 'block';
+    uploadZone.style.display = 'none';
+    predictBtn.disabled = false;
+    resetBtn.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+});
+
+// --- Camera capture ---
+const video = document.getElementById('video');
+const startCameraBtn = document.getElementById('start-camera-btn');
+const captureBtn = document.getElementById('capture-btn');
+const hiddenCanvas = document.getElementById('hidden-canvas');
+const cameraHint = document.getElementById('camera-hint');
+
+startCameraBtn.addEventListener('click', async () => {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.srcObject = stream;
+    startCameraBtn.style.display = 'none';
+    captureBtn.style.display = 'block';
+    cameraHint.textContent = 'Point the camera at the object, then capture.';
+  } catch (err) {
+    cameraHint.textContent = 'Could not access camera. Check browser permissions.';
+  }
+});
+
+captureBtn.addEventListener('click', () => {
+  hiddenCanvas.width = video.videoWidth;
+  hiddenCanvas.height = video.videoHeight;
+  hiddenCanvas.getContext('2d').drawImage(video, 0, 0);
+  capturedImageData = hiddenCanvas.toDataURL('image/png');
+
+  stopCamera();
+  predictBtn.disabled = false;
+  resetBtn.style.display = 'block';
+  cameraHint.textContent = 'Photo captured — click Predict below.';
+});
+
+function stopCamera() {
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+    stream = null;
+  }
+  video.srcObject = null;
+  startCameraBtn.style.display = 'block';
+  captureBtn.style.display = 'none';
+}
+
+// --- Reset ---
+resetBtn.addEventListener('click', () => {
+  capturedImageData = null;
+  predictBtn.disabled = true;
+  resetBtn.style.display = 'none';
+  previewWrap.style.display = 'none';
+  uploadZone.style.display = 'block';
+  fileInput.value = '';
+  cameraHint.textContent = 'Your browser will ask permission to use the camera.';
+  resetResult();
+});
+
+function resetResult() {
+  document.getElementById('result-card').style.display = 'none';
+  document.getElementById('error-text').textContent = '';
+}
+
+// --- Predict ---
+predictBtn.addEventListener('click', async () => {
+  if (!capturedImageData) return;
+  resetResult();
+  predictBtn.disabled = true;
+  predictBtn.textContent = 'Predicting...';
+
+  try {
+    const response = await fetch(BACKEND_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: capturedImageData })
+    });
+    const data = await response.json();
+
+    if (data.error) {
+      document.getElementById('error-text').textContent = 'Error: ' + data.error;
+    } else {
+      document.getElementById('result-label').textContent = data.label;
+      document.getElementById('result-confidence').textContent =
+        'Confidence: ' + data.confidence + '%';
+
+      const scoreBars = document.getElementById('score-bars');
+      scoreBars.innerHTML = '';
+      Object.entries(data.all_scores).forEach(([name, score]) => {
+        scoreBars.innerHTML += `
+          <div class="score-row">
+            <div class="score-name">${name}</div>
+            <div class="score-bar-bg"><div class="score-bar-fill" style="width:${score}%"></div></div>
+            <div class="score-value">${score}%</div>
+          </div>`;
+      });
+
+      document.getElementById('result-card').style.display = 'block';
+    }
+  } catch (err) {
+    document.getElementById('error-text').textContent = 'Could not reach the server.';
+  } finally {
+    predictBtn.disabled = false;
+    predictBtn.textContent = 'Predict';
+  }
+});
+</script>
+
+</body>
+</html>
