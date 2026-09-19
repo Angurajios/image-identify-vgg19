@@ -7,38 +7,49 @@ from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 from PIL import Image
 
-import tensorflow as tf
-from tensorflow.keras.applications.vgg16 import preprocess_input
-from tensorflow.keras.preprocessing.image import img_to_array
+try:
+    import tflite_runtime.interpreter as tflite
+except ImportError:
+    import tensorflow as tf
+    tflite = tf.lite
 
 app = Flask(__name__)
 CORS(app)
 
-
 CLASS_NAMES = ["Apple", "Elephant", "Pen"]
 
-interpreter = tf.lite.Interpreter(model_path="vgg19_CustomImage.tflite")
+interpreter = tflite.Interpreter(model_path="model.tflite")
 interpreter.allocate_tensors()
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
-
+print("TFLite VGG16 model loaded successfully.")
 
 
 def preprocess_image(image_data_url):
     """
     Converts a base64 image (from file upload or camera capture) into the
-    exact format VGG16 expects, using Keras's own preprocess_input function.
+    exact format VGG16 expects: 224x224, BGR order, ImageNet mean-subtracted.
+    This replicates keras.applications.vgg16.preprocess_input manually,
+    so we don't need to install full TensorFlow just for this one function.
     """
     base64_text = image_data_url.split(",")[1]
     image_bytes = base64.b64decode(base64_text)
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     image = image.resize((224, 224))
 
-    array = img_to_array(image)                  # PIL image -> numpy array
-    array = np.expand_dims(array, axis=0)         # shape: (1, 224, 224, 3)
-    array = preprocess_input(array)               # RGB->BGR + mean subtraction, done internally
+    array = np.array(image).astype(np.float32)
 
-    return array.astype(np.float32)
+    # RGB -> BGR (VGG16 was trained on BGR images)
+    array = array[..., ::-1]
+
+    # Subtract ImageNet mean per channel (this is what preprocess_input does)
+    mean = [103.939, 116.779, 123.68]
+    array[..., 0] -= mean[0]
+    array[..., 1] -= mean[1]
+    array[..., 2] -= mean[2]
+
+    array = np.expand_dims(array, axis=0)
+    return array
 
 
 @app.route("/predict", methods=["POST"])
